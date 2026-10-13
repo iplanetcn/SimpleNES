@@ -6,3 +6,6 @@
 build/
 .cache/
 compile_commands.json
+.idea/
+simplenes.log
+cmake-build-debug/

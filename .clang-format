@@ -21,7 +21,7 @@ SpaceBeforeCpp11BracedList: true
 BraceWrapping:
   IndentBraces:    false
 BreakBeforeBraces: Allman
-Standard:        c++11
+Standard:        c++17
 BreakAfterReturnType: Automatic
 PointerAlignment: Left
 BreakBeforeBinaryOperators: None

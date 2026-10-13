@@ -57,42 +57,35 @@ Compiling
 -----------
 
 You need:
-* [SFML 2.*](#installing-sfml) development headers and library
-* C++11 compliant compiler
-* [CMake](https://cgold.readthedocs.io/en/latest/first-step/installation.html) build system
+* SFML 3 development headers and libraries (tested with 3.0.2)
+* A C++17 compiler
+* CMake 3.22 or newer
 
-Compiling is straight forward with cmake, just run cmake on the project directory with CMAKE_BUILD_TYPE=Release
-and you'll get Makefile or equivalent for your platform, with which you can compile the emulator
+On macOS, the build automatically discovers an existing Homebrew `sfml` installation:
 
-For e.g., on Linux/OS X/FreeBSD:
-```
-$ git clone https://github.com/amhndu/SimpleNES
-$ cd SimpleNES
-$ mkdir build/ && cd build/
-$ cmake -DCMAKE_BUILD_TYPE=Release ..
-$ make -j4    # Replace 4 with however many cores you have to spare
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
 ```
 
-If SFML is installed on a non-standard location, specify SFML_ROOT as a cmake variable, e.g. on **Arch Linux**, after installing sfml2 from AUR:
-```
-$ cd SimpleNES && mkdir build/ && cd build/
-$ cmake -DCMAKE_BUILD_TYPE=Release -DSFML_ROOT=/opt/sfml2 ..
-$ make -j8
-```
-See also: [compile.yaml](https://github.com/amhndu/SimpleNES/blob/master/.github/workflows/compile.yml) for platform specific instructions
+For an installation outside the standard search paths, pass its prefix:
 
-Download SimpleNES
------------------
-1. Download an executable based on your platform from the latest run on [Github Actions](https://github.com/amhndu/SimpleNES/actions) OR [Latest Release](https://github.com/amhndu/SimpleNES/releases)
-2. Install [sfml](#installing-sfml)
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/sfml
+cmake --build build --parallel
+```
 
+You can also set `SFML_DIR` to the directory containing `SFMLConfig.cmake`.
+Audio uses the bundled miniaudio library; SFML's Audio component is not required.
+`-DBUILD_STATIC=ON` requires an SFML installation with static libraries.
+
+See [.github/workflows/compile.yml](.github/workflows/compile.yml) for Linux, macOS and Windows builds.
 
 Installing SFML
 -----------------
-* Windows: `vcpkg install sfml`. Alterntaively, download from [SFML](https://www.sfml-dev.org/download/sfml/2.6.2/). See: [compile.yaml](https://github.com/amhndu/SimpleNES/blob/master/.github/workflows/compile.yml) for instructions on pinning sfml to version 2
-* Debian/Ubuntu/derivates: `sudo apt install -y libsfml-dev`
-* Arch/etc: `yay -S sfml2`
-* MacOS: `brew install sfml@2 && brew link sfml@2`
+* macOS: `brew install sfml` (skip this if already installed).
+* Windows: `vcpkg install sfml:x64-windows`, then configure CMake with the vcpkg toolchain.
+* Linux/FreeBSD: install SFML 3 from your package manager, or [build SFML from source](https://www.sfml-dev.org/tutorials/3.0/getting-started/build-from-source/). Older distributions may still package SFML 2, which is incompatible.
 
 
 Running
@@ -134,7 +127,7 @@ Options:
 Controller
 -----------------
 
-Keybindings can be configured with keybindings.conf
+Keybindings can be configured with keybindings.conf. SFML 3 key names are used; existing names such as `Return`, `BackSpace`, and `Quote` remain accepted.
 
 
 Default keybindings:

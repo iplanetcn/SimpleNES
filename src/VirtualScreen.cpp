@@ -6,7 +6,7 @@ void VirtualScreen::create(unsigned int w, unsigned int h, float pixel_size, sf:
 {
     m_vertices.resize(w * h * 6);
     m_screenSize = { w, h };
-    m_vertices.setPrimitiveType(sf::Triangles);
+    m_vertices.setPrimitiveType(sf::PrimitiveType::Triangles);
     m_pixelSize = pixel_size;
     for (std::size_t x = 0; x < w; ++x)
     {
@@ -49,8 +49,6 @@ void VirtualScreen::setPixel(std::size_t x, std::size_t y, sf::Color color)
     auto index = (x * m_screenSize.y + y) * 6;
     if (index >= m_vertices.getVertexCount())
         return;
-
-    sf::Vector2f coord2d(x * m_pixelSize, y * m_pixelSize);
 
     // Triangle-1
     // top-left

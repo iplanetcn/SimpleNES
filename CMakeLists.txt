@@ -1,37 +1,50 @@
-cmake_minimum_required(VERSION 3.12)
-project(SimpleNES)
+cmake_minimum_required(VERSION 3.22)
+project(SimpleNES LANGUAGES C CXX)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-      "Choose the type of build, options are: Debug Release."
-      FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
-
-set(BUILD_STATIC FALSE CACHE STRING "Set this to link external libraries statically")
-
-if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra -g")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
-        #set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-        #set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Add directory containing FindSFML.cmake to module path
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules/;${CMAKE_MODULE_PATH};${CMAKE_SOURCE_DIR}")
+option(BUILD_STATIC "Link external libraries statically" OFF)
+set(SFML_STATIC_LIBRARIES ${BUILD_STATIC})
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Add sources
-file(GLOB SOURCES
-    "${PROJECT_SOURCE_DIR}/main.cpp"
+# Use the existing Homebrew installation on macOS, including Apple Silicon.
+# Explicit SFML_DIR / CMAKE_PREFIX_PATH settings continue to take precedence.
+if(APPLE)
+    find_program(HOMEBREW_EXECUTABLE brew)
+    if(HOMEBREW_EXECUTABLE)
+        execute_process(COMMAND "${HOMEBREW_EXECUTABLE}" --prefix sfml
+            OUTPUT_VARIABLE HOMEBREW_SFML_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+            RESULT_VARIABLE HOMEBREW_SFML_RESULT)
+        if(HOMEBREW_SFML_RESULT EQUAL 0)
+            list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_SFML_PREFIX}")
+        endif()
+    endif()
+endif()
+
+find_package(SFML 3 CONFIG REQUIRED COMPONENTS Graphics)
+find_package(Threads REQUIRED)
+
+file(GLOB SOURCES CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
-    "${PROJECT_SOURCE_DIR}/src/APU/*.cpp"
-)
+    "${PROJECT_SOURCE_DIR}/src/APU/*.cpp")
+add_executable(SimpleNES main.cpp ${SOURCES} vendor/miniaudio/miniaudio.c)
+target_compile_features(SimpleNES PRIVATE cxx_std_17)
+set_target_properties(SimpleNES PROPERTIES CXX_EXTENSIONS OFF)
+target_include_directories(SimpleNES PRIVATE include vendor/miniaudio)
+target_link_libraries(SimpleNES PRIVATE SFML::Graphics Threads::Threads ${CMAKE_DL_LIBS})
 
-file(GLOB VENDOR_SOURCES
-    "${PROJECT_SOURCE_DIR}/vendor/miniaudio/*.c"
-)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(SimpleNES PRIVATE "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:-Wall;-Wextra>")
+    if(BUILD_STATIC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_options(SimpleNES PRIVATE -static-libstdc++ -static-libgcc)
+    endif()
+endif()
 
-# Copy keybindings.conf
-file(COPY keybindings.conf DESTINATION .)
+configure_file(keybindings.conf keybindings.conf COPYONLY)
 
 # Will add __FILENAME__ macros for all source files, which is the filename without full find_path
 # Courtesy of SO
@@ -51,46 +64,5 @@ function(define_file_basename_for_sources targetname)
     endforeach()
 endfunction()
 
-# Specify include Directory
-include_directories(
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/vendor/miniaudio/"
-)
-
-# Set static if BUILD_STATIC is set
-if (BUILD_STATIC)
-    set(SFML_STATIC_LIBRARIES TRUE)
-    # Link libgcc and libstc++ statically as well
-    if(CMAKE_COMPILER_IS_GNUCXX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
-    endif()
-endif()
-
-# Find SFML
-if (SFML_OS_WINDOWS AND SFML_COMPILER_MSVC)
-    find_package(SFML 2 COMPONENTS main audio graphics window system REQUIRED)
-else()
-    find_package(SFML 2 COMPONENTS audio graphics window system REQUIRED)
-endif()
-
-if(SFML_FOUND)
-        include_directories(${SFML_INCLUDE_DIR})
-else()
-        set(SFML_ROOT "" CACHE PATH "SFML top-level directory")
-        message("\nSFML directory not found. Set SFML_ROOT to SFML's top-level path (containing \"include\" and \"lib\" directories).")
-        message("Make sure the SFML libraries with the same configuration (Release/Debug, Static/Dynamic) exist.\n")
-endif()
-
-# generate compile commands for clangd
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-add_executable(SimpleNES ${SOURCES} ${VENDOR_SOURCES})
-target_link_libraries(SimpleNES PRIVATE ${SFML_LIBRARIES} ${SFML_DEPENDENCIES})
-
-set_property(TARGET SimpleNES PROPERTY CXX_STANDARD 11)
-set_property(TARGET SimpleNES PROPERTY CXX_STANDARD_REQUIRED ON)
-
-target_link_libraries(SimpleNES)
 define_file_basename_for_sources(SimpleNES)
-
 install(TARGETS SimpleNES RUNTIME DESTINATION bin)

@@ -43,7 +43,8 @@ void Emulator::run(std::string rom_path)
     m_cpu.reset();
     m_ppu.reset();
 
-    m_window.create(sf::VideoMode(NESVideoWidth * m_screenScale, NESVideoHeight * m_screenScale),
+    m_window.create(sf::VideoMode({ static_cast<unsigned int>(NESVideoWidth * m_screenScale),
+                                    static_cast<unsigned int>(NESVideoHeight * m_screenScale) }),
                     "SimpleNES",
                     sf::Style::Titlebar | sf::Style::Close);
     m_window.setVerticalSyncEnabled(true);
@@ -54,31 +55,31 @@ void Emulator::run(std::string rom_path)
 
     m_audioPlayer.start();
 
-    sf::Event event;
-    bool      focus = true, pause = false;
+    bool focus = true, pause = false;
     while (m_window.isOpen())
     {
-        while (m_window.pollEvent(event))
+        while (const auto event = m_window.pollEvent())
         {
-            if (event.type == sf::Event::Closed ||
-                (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape))
+            const auto* pressed  = event->getIf<sf::Event::KeyPressed>();
+            const auto* released = event->getIf<sf::Event::KeyReleased>();
+            if (event->is<sf::Event::Closed>() || (pressed && pressed->code == sf::Keyboard::Key::Escape))
             {
                 m_window.close();
                 return;
             }
-            else if (event.type == sf::Event::GainedFocus)
+            else if (event->is<sf::Event::FocusGained>())
             {
                 focus          = true;
                 const auto now = high_resolution_clock::now();
                 LOG(Info) << "Gained focus. Removing " << (now - m_lastWakeup).count() << "ns from timers" << std::endl;
                 m_lastWakeup = now;
             }
-            else if (event.type == sf::Event::LostFocus)
+            else if (event->is<sf::Event::FocusLost>())
             {
                 focus = false;
                 LOG(Info) << "Losing focus; paused." << std::endl;
             }
-            else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::F2)
+            else if (pressed && pressed->code == sf::Keyboard::Key::F2)
             {
                 pause = !pause;
                 if (!pause)
@@ -92,7 +93,7 @@ void Emulator::run(std::string rom_path)
                     LOG(Info) << "Paused." << std::endl;
                 }
             }
-            else if (pause && event.type == sf::Event::KeyReleased && event.key.code == sf::Keyboard::F3)
+            else if (pause && released && released->code == sf::Keyboard::Key::F3)
             {
                 for (int i = 0; i < 29781; ++i) // Around one frame
                 {
@@ -106,11 +107,11 @@ void Emulator::run(std::string rom_path)
                     m_apu.step();
                 }
             }
-            else if (focus && event.type == sf::Event::KeyReleased && event.key.code == sf::Keyboard::F4)
+            else if (focus && released && released->code == sf::Keyboard::Key::F4)
             {
                 Log::get().setLevel(Info);
             }
-            else if (focus && event.type == sf::Event::KeyReleased && event.key.code == sf::Keyboard::F5)
+            else if (focus && released && released->code == sf::Keyboard::Key::F5)
             {
                 Log::get().setLevel(InfoVerbose);
             }

@@ -2,83 +2,73 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 jobs:
-  build_linux:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Release, Debug]
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y libsfml-dev
-        
-    - name: Build
-      run: |
-        mkdir build/ && cd build/
-        cmake -DCMAKE_BUILD_TYPE=Release ..
-        make -j4
-    - uses: actions/upload-artifact@v4
-      with:
-        name: SimpleNES-linux
-        path: build/SimpleNES
+      - name: Install SFML 3 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev libxcursor-dev libxi-dev libudev-dev libfreetype-dev libgl1-mesa-dev xvfb
+          git clone --depth 1 --branch 3.0.2 https://github.com/SFML/SFML.git "$RUNNER_TEMP/sfml"
+          cmake -S "$RUNNER_TEMP/sfml" -B "$RUNNER_TEMP/sfml-build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/sfml-install" -DSFML_BUILD_AUDIO=OFF -DSFML_BUILD_NETWORK=OFF
+          cmake --build "$RUNNER_TEMP/sfml-build" --parallel
+          cmake --install "$RUNNER_TEMP/sfml-build"
+          echo "CMAKE_PREFIX_PATH=$RUNNER_TEMP/sfml-install" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/sfml-install/lib" >> "$GITHUB_ENV"
 
+      - name: Install SFML 3 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sfml
 
-  build_macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 1
+      - name: Install SFML 3 (Windows)
+        if: runner.os == 'Windows'
+        run: vcpkg install sfml:x64-windows
 
-    - name: Install dependencies
-      run: |
-        brew install sfml@2
-        brew link --force --overwrite sfml@2
-        
-    - name: Build
-      run: |
-        mkdir build/ && cd build/
-        cmake -DCMAKE_BUILD_TYPE=Release ..
-        make -j4
-        
-    - uses: actions/upload-artifact@v4
-      with:
-        name: SimpleNES-macos
-        path: build/SimpleNES
-        
-  build_windows:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 1
+      - name: Configure (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
-    - name: Install dependencies
-      run: |
-        $manifest = @'
-        {
-            "dependencies": [ "sfml" ],
-            "builtin-baseline": "df6921c0b6cdf95269a4a3093e267b59e4bf0f5b",
-            "overrides": [
-                { "name": "sfml", "version": "2.6.2" }
-            ]
-        }
-        '@
-        Add-Content ./vcpkg.json $manifest
-        vcpkg install
-        
-    - name: Build
-      run: |
-        mkdir build/ && cd build/
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-        cmake --build . --config Release
-        
-    - uses: actions/upload-artifact@v4
-      with:
-        name: SimpleNES-win.exe
-        path: build/Release/SimpleNES.exe
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
+
+      - name: Smoke test (Linux / macOS)
+        if: runner.os != 'Windows'
+        working-directory: build
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a ./SimpleNES --help
+          else
+            ./SimpleNES --help
+          fi
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        working-directory: build
+        run: ./${{ matrix.build_type }}/SimpleNES.exe --help
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.build_type == 'Release'
+        with:
+          name: SimpleNES-${{ runner.os }}
+          path: |
+            build/SimpleNES
+            build/Release/*.exe
+            build/Release/*.dll
+            build/keybindings.conf
