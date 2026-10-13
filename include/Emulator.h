@@ -2,6 +2,7 @@
 #define EMULATOR_H
 #include <SFML/Graphics.hpp>
 #include <chrono>
+#include <optional>
 
 #include "APU/APU.h"
 #include "AudioPlayer.h"
@@ -31,30 +32,30 @@ public:
     void muteAudio();
 
 private:
-    void                    OAMDMA(Byte page);
-    Byte                    DMCDMA(Address addr);
+    void                            OAMDMA(Byte page);
+    Byte                            DMCDMA(Address addr);
 
-    CPU                     m_cpu;
+    CPU                             m_cpu;
 
-    AudioPlayer             m_audioPlayer;
+    AudioPlayer                     m_audioPlayer;
 
-    PictureBus              m_pictureBus;
-    PPU                     m_ppu;
-    APU                     m_apu;
-    Cartridge               m_cartridge;
-    std::unique_ptr<Mapper> m_mapper;
+    PictureBus                      m_pictureBus;
+    PPU                             m_ppu;
+    APU                             m_apu;
+    Cartridge                       m_cartridge;
+    std::unique_ptr<Mapper>         m_mapper;
 
-    Controller              m_controller1, m_controller2;
+    Controller                      m_controller1, m_controller2;
 
-    MainBus                 m_bus;
+    MainBus                         m_bus;
 
-    sf::RenderWindow        m_window;
-    VirtualScreen           m_emulatorScreen;
-    float                   m_screenScale;
+    std::optional<sf::RenderWindow> m_window;
+    VirtualScreen                   m_emulatorScreen;
+    float                           m_screenScale;
 
-    TimePoint               m_lastWakeup;
+    TimePoint                       m_lastWakeup;
 
-    Duration                m_elapsedTime;
+    Duration                        m_elapsedTime;
 };
 }
 #endif // EMULATOR_H

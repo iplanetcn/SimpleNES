@@ -43,11 +43,14 @@ void Emulator::run(std::string rom_path)
     m_cpu.reset();
     m_ppu.reset();
 
-    m_window.create(sf::VideoMode({ static_cast<unsigned int>(NESVideoWidth * m_screenScale),
-                                    static_cast<unsigned int>(NESVideoHeight * m_screenScale) }),
-                    "SimpleNES",
-                    sf::Style::Titlebar | sf::Style::Close);
-    m_window.setVerticalSyncEnabled(true);
+    // SFML 3 constructs a graphics context with RenderWindow, even before create().
+    // Keep command-line help and ROM validation independent of a display.
+    auto& window = m_window.emplace();
+    window.create(sf::VideoMode({ static_cast<unsigned int>(NESVideoWidth * m_screenScale),
+                                  static_cast<unsigned int>(NESVideoHeight * m_screenScale) }),
+                  "SimpleNES",
+                  sf::Style::Titlebar | sf::Style::Close);
+    window.setVerticalSyncEnabled(true);
     m_emulatorScreen.create(NESVideoWidth, NESVideoHeight, m_screenScale, sf::Color::White);
 
     m_lastWakeup  = high_resolution_clock::now();
@@ -56,15 +59,15 @@ void Emulator::run(std::string rom_path)
     m_audioPlayer.start();
 
     bool focus = true, pause = false;
-    while (m_window.isOpen())
+    while (window.isOpen())
     {
-        while (const auto event = m_window.pollEvent())
+        while (const auto event = window.pollEvent())
         {
             const auto* pressed  = event->getIf<sf::Event::KeyPressed>();
             const auto* released = event->getIf<sf::Event::KeyReleased>();
             if (event->is<sf::Event::Closed>() || (pressed && pressed->code == sf::Keyboard::Key::Escape))
             {
-                m_window.close();
+                window.close();
                 return;
             }
             else if (event->is<sf::Event::FocusGained>())
@@ -137,8 +140,8 @@ void Emulator::run(std::string rom_path)
                 m_elapsedTime -= cpu_clock_period_ns;
             }
 
-            m_window.draw(m_emulatorScreen);
-            m_window.display();
+            window.draw(m_emulatorScreen);
+            window.display();
         }
         else
         {
